@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MC 客户端构建器 — 免启动器下载 / 配置 / 打包</title>
+<meta name="description" content="一个不依赖启动器的 Minecraft 客户端下载与打包工具：全量版本、Forge / OptiFine / Fabric / Quilt、自动装 Java、32 线程下载，成品可直接被 HMCL 启动。">
+<style>
+  :root{
+    --bg:#0f1117; --panel:#161922; --card:#1c202b; --border:#2a3040;
+    --text:#e8ebf3; --muted:#8b93a8; --accent:#4c8dff; --accent2:#7a5cff;
+    --green:#3ecf8e; --yellow:#f5b84d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Microsoft YaHei UI","PingFang SC","Segoe UI",system-ui,sans-serif;
+    line-height:1.7; overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  .glow{
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(600px 300px at 15% 0%, rgba(76,141,255,.18), transparent 70%),
+      radial-gradient(600px 300px at 85% 10%, rgba(122,92,255,.15), transparent 70%);
+  }
+  header{
+    position:sticky;top:0;z-index:10;backdrop-filter:blur(14px);
+    background:rgba(15,17,23,.72);border-bottom:1px solid rgba(42,48,64,.7);
+  }
+  .nav{display:flex;align-items:center;gap:12px;height:64px}
+  .logo{
+    width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    font-weight:800;font-size:13px;color:#fff;
+  }
+  .brand{font-weight:700;font-size:15px}
+  .nav .spacer{flex:1}
+  .nav a.link{color:var(--muted);font-size:14px;padding:8px 10px;border-radius:8px}
+  .nav a.link:hover{color:var(--text);background:var(--card)}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;border-radius:11px;
+    padding:11px 18px;font-size:14px;font-weight:600;border:1px solid transparent;
+    transition:.18s ease;cursor:pointer;white-space:nowrap;
+  }
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:#5d99ff;transform:translateY(-1px)}
+  .btn-ghost{background:transparent;border-color:var(--border);color:var(--text)}
+  .btn-ghost:hover{background:var(--card);border-color:#3a435c}
+  .btn-sm{padding:8px 14px;font-size:13px;border-radius:9px}
+
+  main{position:relative;z-index:1}
+  .hero{padding:72px 0 40px;display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+  .badge{
+    display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--green);
+    border:1px solid rgba(62,207,142,.35);background:rgba(62,207,142,.08);
+    padding:4px 12px;border-radius:999px;margin-bottom:18px;
+  }
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  h1{font-size:46px;line-height:1.2;letter-spacing:-.5px;margin-bottom:16px}
+  h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lead{color:var(--muted);font-size:16px;max-width:520px;margin-bottom:26px}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .meta{color:#6f7a92;font-size:12.5px}
+  .shot{
+    border:1px solid var(--border);border-radius:16px;overflow:hidden;
+    background:var(--panel);box-shadow:0 30px 80px rgba(0,0,0,.55);
+    transform:perspective(1200px) rotateY(-4deg) rotateX(2deg);
+  }
+  .shot img{display:block;width:100%;height:auto}
+
+  section{padding:56px 0}
+  .section-head{text-align:center;margin-bottom:36px}
+  .section-head h2{font-size:28px;margin-bottom:8px}
+  .section-head p{color:var(--muted);font-size:14px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:22px 20px;transition:.2s ease;
+  }
+  .card:hover{transform:translateY(-3px);border-color:#3a435c;background:#20242f}
+  .ico{
+    width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+    background:rgba(76,141,255,.12);color:var(--accent);font-size:18px;margin-bottom:14px;
+  }
+  .card h3{font-size:15px;margin-bottom:6px}
+  .card p{color:var(--muted);font-size:13px;line-height:1.65}
+
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:step}
+  .step{position:relative;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px}
+  .step::before{
+    counter-increment:step;content:counter(step);
+    position:absolute;top:18px;right:20px;font-size:34px;font-weight:800;
+    color:rgba(255,255,255,.05);
+  }
+  .step h3{font-size:15px;margin-bottom:6px}
+  .step p{color:var(--muted);font-size:13px}
+  .step code{background:#0f1117;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px;color:#b9c1d4}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px}
+  .panel h3{font-size:16px;margin-bottom:12px}
+  .panel ul{list-style:none;display:grid;gap:8px}
+  .panel li{color:var(--muted);font-size:13.5px;padding-left:18px;position:relative}
+  .panel li::before{content:"";position:absolute;left:4px;top:9px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+  .download{
+    background:linear-gradient(135deg,rgba(76,141,255,.12),rgba(122,92,255,.12));
+    border:1px solid rgba(76,141,255,.3);border-radius:18px;padding:36px;text-align:center;
+  }
+  .download h2{font-size:26px;margin-bottom:8px}
+  .download p{color:var(--muted);font-size:14px;margin-bottom:22px}
+  .download .cta{justify-content:center;margin-bottom:10px}
+
+  footer{border-top:1px solid var(--border);padding:28px 0 40px;color:#6f7a92;font-size:12.5px}
+  footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+  @media (max-width:900px){
+    .hero{grid-template-columns:1fr;padding-top:48px}
+    .shot{transform:none}
+    .grid,.steps{grid-template-columns:1fr}
+    .split{grid-template-columns:1fr}
+    h1{font-size:34px}
+    .nav a.link{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+
+<header>
+  <div class="wrap nav">
+    <div class="logo">MC</div>
+    <div class="brand">MC 客户端构建器</div>
+    <div class="spacer"></div>
+    <a class="link" href="#features">功能</a>
+    <a class="link" href="#how">使用</a>
+    <a class="link" href="#download">下载</a>
+    <a class="btn btn-ghost btn-sm" href="https://github.com/gangbeng1145/mc-client-builder" target="_blank" rel="noopener">GitHub</a>
+    <a class="btn btn-primary btn-sm" href="https://github.com/gangbeng1145/mc-client-builder/releases/latest" target="_blank" rel="noopener">下载 Windows 版</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <div class="badge"><span class="dot"></span> v1.2 · Windows 10 / 11 64 位</div>
+        <h1>不用启动器，<br>也能把 <span>Minecraft</span> 装明白</h1>
+        <p class="lead">
+          选版本、选加载器，自动下载原版、依赖库和资源，调用官方安装器装好
+          Forge / OptiFine / Fabric / Quilt，最后打包成一个 zip。
+          解压出来的文件夹，HMCL 直接能启动。
+        </p>
+        <div class="cta">
+          <a class="btn btn-primary" href="https://github.com/gangbeng1145/mc-client-builder/releases/latest" target="_blank" rel="noopener">下载 v1.2（52 MB）</a>
+          <a class="btn btn-ghost" href="https://github.com/gangbeng1145/mc-client-builder" target="_blank" rel="noopener">查看源码</a>
+        </div>
+        <div class="meta">MIT 开源 · 无需安装 Python · 内置离线版本清单</div>
+      </div>
+      <div class="shot">
+        <img src="docs/screenshot.png" alt="MC 客户端构建器界面截图" loading="lazy">
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="section-head">
+        <h2>该有的都有</h2>
+        <p>从版本清单到最终 zip，一条链全自动</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="ico">▦</div>
+          <h3>900+ 全量版本</h3>
+          <p>正式版、快照、远古 Alpha / Beta，支持搜索和类型筛选。</p>
+        </div>
+        <div class="card">
+          <div class="ico">◈</div>
+          <h3>四大加载器</h3>
+          <p>Forge（新旧 installer）、OptiFine（官方 Patcher）、Fabric、Quilt。</p>
+        </div>
+        <div class="card">
+          <div class="ico">☕</div>
+          <h3>顺手装 Java</h3>
+          <p>内置 Mojang 官方运行时 8 / 16 / 17 / 21 / 25，装完自动进列表。</p>
+        </div>
+        <div class="card">
+          <div class="ico">⇅</div>
+          <h3>32 线程下载</h3>
+          <p>多源自动回退、SHA-1 校验、按哈希缓存，失败自动换源重试。</p>
+        </div>
+        <div class="card">
+          <div class="ico">◐</div>
+          <h3>离线兜底</h3>
+          <p>版本清单接口不可用时，自动切换内置清单，列表照样显示。</p>
+        </div>
+        <div class="card">
+          <div class="ico">◎</div>
+          <h3>网络诊断</h3>
+          <p>DNS、443 端口、HTTPS、系统代理、时间偏差，一键定位问题。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="section-head">
+        <h2>三步出包</h2>
+        <p>不需要懂 version JSON，也不需要手动补库</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <h3>选版本</h3>
+          <p>左侧挑 Minecraft 版本，右侧决定要不要装加载器。</p>
+        </div>
+        <div class="step">
+          <h3>点构建</h3>
+          <p>选好 Java 和输出目录，点「开始构建」，进度和日志全程可见。</p>
+        </div>
+        <div class="step">
+          <h3>拿去启动</h3>
+          <p>解压生成的 zip，把文件夹作为 HMCL 的游戏目录，或合并 <code>versions</code> / <code>libraries</code> / <code>assets</code>。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="split">
+        <div class="panel">
+          <h3>系统要求</h3>
+          <ul>
+            <li>Windows 10 / 11 64 位</li>
+            <li>已安装 Java（工具也能帮你装）</li>
+            <li>建议预留 5 GB 以上磁盘空间</li>
+            <li>需要能访问 Mojang 或 BMCLAPI</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>常见问题</h3>
+          <ul>
+            <li>首次启动慢：单文件 exe 要先解压，5–10 秒正常</li>
+            <li>杀毒误报：PyInstaller 单文件常见，加信任即可</li>
+            <li>Forge 1.13+ 不能叠 OptiFine，工具会明确提示</li>
+            <li>只支持 64 位，Win7 不行</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="download">
+      <div class="download">
+        <h2>下载 v1.2</h2>
+        <p>Windows 10 / 11 64 位 · 52 MB · 解压即用，无需 Python</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="https://github.com/gangbeng1145/mc-client-builder/releases/latest" target="_blank" rel="noopener">从 GitHub Releases 下载</a>
+          <a class="btn btn-ghost" href="https://github.com/gangbeng1145/mc-client-builder" target="_blank" rel="noopener">浏览源码</a>
+        </div>
+        <div class="meta">SHA256 校验值见 Release 说明 · 遇到问题请提 Issue</div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      非官方工具，与 Mojang / Microsoft 无关。仅下载公开的客户端文件，不包含游戏本体。<br>
+      Minecraft 版权归 Mojang Studios 所有，请遵守 EULA。
+    </div>
+    <div>MIT License · © 2026 gangbeng1145</div>
+  </div>
+</footer>
+</body>
+</html>
