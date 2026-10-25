@@ -39,7 +39,15 @@
 
 ### 方式一：下载 exe
 
-到 [Releases](../../releases) 下载 `MC-Client-Builder_vX.Y_Win64.zip`，解压后双击 `MC客户端构建器.exe`。
+**GitHub 直链**：
+
+<https://github.com/gangbeng1145/mc-client-builder/releases/download/v1.2.0/MC-Client-Builder_v1.2_Win64.zip>
+
+**蓝奏云备用**（密码 `35dx`）：
+
+<https://wwbdi.lanzoum.com/ikpIK4d6ufba>
+
+解压后双击 `MC客户端构建器.exe`。
 
 > 单文件 exe 首次启动需要解压，约 5–10 秒；个别杀毒软件可能误报，加信任即可。
 
