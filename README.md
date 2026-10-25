@@ -33,31 +33,75 @@
 
 ### 方式一：下载 exe
 
-到 [Releases](../../releases) 下载 `MC客户端构建器_vX.Y_Win64.zip`，解压后双击 `MC客户端构建器.exe`。
+到 [Releases](../../releases) 下载 `MC-Client-Builder_vX.Y_Win64.zip`，解压后双击 `MC客户端构建器.exe`。
 
 > 单文件 exe 首次启动需要解压，约 5–10 秒；个别杀毒软件可能误报，加信任即可。
 
 ### 方式二：源码运行
 
 ```bat
-git clone <本仓库地址>
-cd MC-Downloader-OpenSource
+git clone https://github.com/gangbeng1145/mc-client-builder.git
+cd mc-client-builder
 run.bat
 ```
 
 首次运行会自动创建 `.venv` 并安装依赖。
 
-## 使用流程
+## 使用步骤
 
-1. 左侧选 Minecraft 版本（可搜索、按正式版 / 快照 / 远古筛选）
-2. 右侧选加载器与版本（原版可跳过）
-3. 选 Java；没有合适版本就点「安装 Java」
-4. 选「构建目录」和「输出目录」
-5. 点「开始构建」，完成后到输出目录取 `<实例名>.zip`
+### 1. 启动
 
-## 产物与 HMCL
+双击 `MC客户端构建器.exe`，或源码运行 `run.bat`。
+窗口加载后会从 BMCLAPI / Mojang 拉取版本清单；如果清单接口不可用，会自动读取内置的离线清单（920 个版本）。
 
-zip 解压后是一个完整游戏目录：
+### 2. 选 Minecraft 版本
+
+左侧列表支持：
+
+- 搜索：输入 `1.20`、`1.12.2`、`26.3` 等关键词
+- 筛选：全部 / 正式版 / 快照 / 远古（Alpha、Beta）
+
+### 3. 选加载器
+
+右侧「加载器」下拉：
+
+| 选项 | 说明 |
+|---|---|
+| 原版 | 不装加载器，纯净客户端 |
+| Forge | 选具体 Forge 版本，工具调用官方 installer 安装 |
+| OptiFine | 选具体 OptiFine 版本（`HD_U_xxx`） |
+| Fabric / Quilt | 选 loader 版本，读取官方 meta 生成 |
+
+> Forge 1.13+ 不能叠加 OptiFine，工具会明确报错。
+
+### 4. 选 Java
+
+工具会自动扫描本机 Java。没有合适的版本就点「安装 Java」：
+
+- 支持 Java 8 / 16 / 17 / 21 / 25（Mojang 官方运行时）
+- 安装到 `构建目录\java\<组件>-<版本>`
+- 装完自动加入下拉框并选中
+
+### 5. 选目录
+
+- **构建目录**：存放 `versions / libraries / assets` 等中间文件
+- **输出目录**：最终 `<实例名>.zip` 放这里
+
+默认都在用户目录下（`%USERPROFILE%\MC_Downloader_Work` / `MC_Downloader_Out`）。
+
+### 6. 开始构建
+
+点「开始构建」，底部会显示：
+
+- 当前阶段（版本 JSON → client jar → 资源 → 依赖库 → 加载器 → 打包）
+- 文件进度条
+- 实时日志（失败会写明是哪个 URL、什么问题）
+
+构建过程中可以「取消」。
+
+### 7. 使用成品
+
+到输出目录取 `<实例名>.zip`，解压后是一个完整游戏目录：
 
 ```
 <实例名>/
@@ -75,6 +119,42 @@ zip 解压后是一个完整游戏目录：
 
 > `libraries` 和 `assets` 必须一起带，只复制 `versions` 会缺文件。
 
+## 工作原理
+
+```
+版本清单 (manifest)
+      │
+      ▼
+版本 JSON (version.json)
+      │
+      ├─ downloads.client ──────────► versions/<id>/<id>.jar
+      ├─ libraries[] ───────────────► libraries/<maven 路径>
+      ├─ assetIndex ────────────────► assets/indexes/<id>.json
+      │                               └─ objects ─► assets/objects/<xx>/<hash>
+      └─ logging ───────────────────► assets/log_configs/<id>
+      │
+      ▼
+加载器安装
+      ├─ Forge: 下载 installer → --installClient → 官方 processor 生成子版本
+      ├─ OptiFine: 下载 installer → optifine.Patcher → 补丁库 + launchwrapper
+      ├─ Fabric / Quilt: 读 meta → 生成 profile JSON + 依赖
+      │
+      ▼
+写入版本 JSON（官方 launcher 规范，inheritsFrom 继承链）
+      │
+      ▼
+打包 zip（jar/ogg 等已压缩文件直接 store，JSON 等 deflate）
+```
+
+几个关键点：
+
+1. **版本清单**：优先 BMCLAPI，失败换 piston-meta / launchermeta，再失败用内置 `assets/fallback/version_manifest.json`。
+2. **依赖解析**：把 `group:artifact:version[:classifier]` 转成 Maven 目录，处理 `rules`（操作系统 / 架构）、`natives`、`classifier`。
+3. **完整性**：每个文件带 SHA-1，下载到临时文件 → 校验 → 原子替换；缓存按 hash 存，命中直接硬链接。
+4. **加载器隔离**：子版本用 `inheritsFrom` 指向原版，只写增量字段（`mainClass`、`arguments`、`libraries`），符合 Mojang 启动规范，HMCL / 官方启动器都能识别。
+5. **并发**：`ThreadPoolExecutor` 默认 32 线程；大文件（如 Java 的 `lib/modules`、Forge installer）单独串行，避免和几百个小文件抢线程池。
+6. **多源回退**：同一个文件有多个候选 URL（镜像 + 官方），失败自动换下一个，每个 URL 重试 3 次。
+
 ## 命令行
 
 ```bat
@@ -86,6 +166,7 @@ python verify.py <游戏目录> <版本id>
 - `--mc` 版本号，`--loader` 取 `none/forge/optifine/fabric/quilt`
 - `--work` / `--out` 构建目录与输出目录
 - `--no-assets` 跳过资源下载（调试用）
+- `--install-java` 只安装 Java 运行时
 - `verify.py` 检查继承链、依赖库、资源是否齐全
 
 ## 项目结构
@@ -135,12 +216,62 @@ python -m PyInstaller --onefile --windowed --name "MC客户端构建器" ^
 
 所有文件下载后都会做 SHA-1 校验。
 
+## 学习目标
+
+这个项目最初是练手，适合用来学习：
+
+1. **HTTP 客户端工程化**
+   - 连接池、并发、超时、重试、指数退避
+   - 多源镜像与自动回退
+   - 流式下载 + 边下边算 SHA-1 + 原子写入
+2. **Maven 坐标与依赖解析**
+   - `group:artifact:version:classifier@ext` 转路径
+   - `rules`（os / arch / features）过滤、natives 分类器
+3. **Minecraft 启动规范**
+   - version JSON 字段、`inheritsFrom` 继承链、`arguments` 合并
+   - assets 索引与 objects 寻址、旧版本 virtual 映射
+4. **加载器安装机制**
+   - Forge installer 的 `install_profile.json` 与 processors
+   - OptiFine 的 `Patcher`、launchwrapper、tweakClass
+   - Fabric / Quilt meta 与 profile JSON
+5. **Java 运行时管理**
+   - Mojang java-runtime 清单、按相对路径落盘、大文件下载策略
+6. **桌面 GUI**
+   - PySide6 线程 / 信号槽、进度上报、无边框窗口、QSS 主题
+7. **发布工程**
+   - PyInstaller 单文件打包、GitHub Release、GitHub Pages
+
 ## 已知限制
 
 - 仅支持 Windows 10 / 11 64 位
 - Forge 1.13+ 不能叠加 OptiFine（启动器机制冲突），工具会明确报错
 - 未内置 NeoForge（下载源在部分网络环境不可达）
 - 首次全量构建约 3–5 分钟，资源包 zip 可能 600 MB+
+
+## 许可证与 HMCL 的关系
+
+本项目采用 **[MIT](LICENSE)**。
+
+项目在开发时研究过 [HMCL](https://github.com/HMCL-dev/HMCL) 的公开下载流程和 Minecraft 启动规范，但：
+
+- **没有复制或包含 HMCL 的任何源代码或二进制文件**；
+- 只参考了公开可观察的行为（下载哪些文件、如何组织版本 JSON）以及 Mojang 官方启动规范；
+- 因此本项目是独立实现，不是 HMCL 的衍生作品，可以继续使用 MIT。
+
+HMCL 本身采用 **GNU GPL v3.0**（[许可证全文](https://github.com/HMCL-dev/HMCL?tab=GPL-3.0-1-ov-file#)）。这里把与分发有关的义务说清楚：
+
+1. **分发 HMCL 或其修改版时**，必须遵守 GPL-3.0：
+   - 随附完整的对应源代码（GPLv3 §5 / §6）；
+   - 保留版权声明和许可证文本；
+   - 不得附加额外限制（GPLv3 §10）。
+2. **以二进制形式分发**（例如把 HMCL 打包进整合包）时，GPLv3 §6 要求同时提供对应源码，或提供书面报价按成本价提供源码。
+3. **把本项目与 HMCL 一起分发**时，两者分别适用 MIT 与 GPL-3.0：
+   - 本项目（独立进程、独立文件）通常不构成 HMCL 的衍生作品；
+   - 但 HMCL 部分仍必须满足 GPL-3.0 的全部分发义务；
+   - 如果修改了 HMCL 的代码再分发，修改后的 HMCL 也必须以 GPL-3.0 开源。
+4. 本项目与 HMCL 官方**没有任何隶属或背书关系**。
+
+> 以上是开发者的理解，不构成法律意见；涉及商业分发请咨询律师。
 
 ## 免责声明
 
@@ -151,4 +282,4 @@ python -m PyInstaller --onefile --windowed --name "MC客户端构建器" ^
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 gangbeng1145
