@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.spec
+config.json
+netdiag.txt
+*.log
+smoke*.png
+auto_*.png
+MC_Downloader_Work/
+MC_Downloader_Out/
+.DS_Store
+Thumbs.db
