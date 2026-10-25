@@ -1,5 +1,7 @@
 # MC 客户端构建器
 
+> 在线主页：<https://gangbeng1145.github.io/mc-client-builder/>
+
 > 一个不依赖启动器的 Minecraft 客户端下载 / 配置 / 打包工具。
 > 选好版本和加载器，自动下载原版、依赖库、资源文件，调用官方安装器装好 Forge / OptiFine / Fabric / Quilt，最后打包成一个可以直接被 HMCL 启动的 zip。
 
